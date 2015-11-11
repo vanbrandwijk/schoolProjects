@@ -39,8 +39,17 @@ struct message parseMessage(char *buffer) {
 	return rmsg;
 }
 
-void pDebug(int debug, char *message) {
+void pDebug(int debug, char *direction, struct message rmsg) {
 	if ( debug == 1 ) {
-		printf("debug: %s \n");
+		if ( strcmp(direction, "SENT") == 0 ) {
+			printf("DEBUG: Sending <%i %s %s>\n",
+				rmsg.cid, rmsg.str1, rmsg.str2);
+		} else if ( strcmp(direction, "RECV") == 0 ) {
+			printf("DEBUG: Receiving <%i %s %s>\n",
+				rmsg.cid, rmsg.str1, rmsg.str2);
+		} else {
+			printf("DEBUG: <%i %s %s>\n", 
+				rmsg.cid, rmsg.str1, rmsg.str2);
+		}
 	}
 }

@@ -12,13 +12,14 @@
 #include <unistd.h>
 #include "chatUtil.h"
 
-struct clientInformation clientRegister[MAX_CLIENTS];
+struct clientInformation clientRegister[MAX_CLIENTS+1];
 
 void usage();
 void startServer(int port, int debug);
 int readClientMessage(int debug, int clientSD);
 void addClient(int clientSD, struct sockaddr_in client_addr, 
 	char *domain, int debug);
+void removeClient(int sd, int cid, char *domain, int debug);
 void initialize();
 void sendJoinAck(int sd, int connectionID, int debug);
 void sendBcastMessage(int sd, struct message theMessage, int debug);
@@ -62,6 +63,7 @@ void initialize() {
 
 void usage() {
 	printf("Usage: chatServer <port> <debug>\n");
+	exit(1);
 }
 
 void startServer(int port, int debug) {
@@ -72,11 +74,10 @@ void startServer(int port, int debug) {
 	int i;
 	fd_set active_fd_set, read_fd_set;
 
-	pDebug(debug, "Started server...");
-
 	sd = socket(AF_INET, SOCK_DGRAM, 0);
 	if ( sd < 0 ) {
-		pDebug(debug, "Error opening socket");
+		perror("Error opening socket");
+		exit(1);
 	}
 
 	bzero((char *) &serv_addr, sizeof(serv_addr));
@@ -86,7 +87,10 @@ void startServer(int port, int debug) {
 	
 	if ( bind(sd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) 
 		< 0 ) {
-		pDebug(debug, "Error binding to socket");
+		perror("Error binding to socket");
+		exit(1);
+	} else {
+		printf("Waiting for data on UDP port %i\n", port);
 	}
 
 	while ( 1 ) {
@@ -104,17 +108,17 @@ int receiveClientMessage(int sd, int debug) {
 
 	receivedLen = recvfrom(sd, buffer, 3*MAX_LINE, 0, 
 		(struct sockaddr *)&clientAddr, &clientLen);
-
+	
 	rmsg = parseMessage(buffer);
+	pDebug(debug, "RECV", rmsg);	
+
 	if ( rmsg.cid == 0 && strcmp(rmsg.str1,"JOIN") == 0 ) {
 		addClient(sd, clientAddr, rmsg.str2, debug);
 	} else if (rmsg.cid < 0 && strcmp(rmsg.str1,"QUIT") == 0 ) {
+		removeClient(sd, rmsg.cid, rmsg.str2, debug);
 		//quit logic
 	} else {
 		sendBcastMessage(sd, rmsg, debug);
-		fprintf(stderr, "CID: %i\n", rmsg.cid);
-		fprintf(stderr, "Control: %s\n", rmsg.str1);
-		fprintf(stderr, "Message: %s\n", rmsg.str2);
 	}
 }
 
@@ -122,7 +126,7 @@ void addClient(int sd, struct sockaddr_in client_addr, char *domain, int debug) 
 	int i;
 	int allocated = -1;
 
-	for ( i = 0; i < MAX_CLIENTS; i++ ) {
+	for ( i = 1; i < MAX_CLIENTS+1; i++ ) {
 		if ( clientRegister[i].connected == 0 ) {
 			clientRegister[i].connected = 1;
 			bcopy((char *)&client_addr, 
@@ -135,11 +139,20 @@ void addClient(int sd, struct sockaddr_in client_addr, char *domain, int debug) 
 	}
 
 	if ( allocated >= 0 ) {
-		pDebug(debug, "Allocating ...");
 		sendJoinAck(sd, allocated, debug);
 	} else {
-		pDebug(debug, "Could not allocate ... server busy");
+		printf("Server can only support %i connections.\n", i);
 	}
+}
+
+void removeClient(int sd, int cid, char *domain, int debug) {
+	struct message rmsg;
+	rmsg.cid = -1 * cid;
+	strcpy(rmsg.str1, "QUIT");
+	strcpy(rmsg.str2, domain);
+	
+	sendBcastMessage(sd, rmsg, debug);
+	clientRegister[cid].connected = 0;
 }
 	
 void sendJoinAck(int sd, int connectionID, int debug) {
@@ -152,7 +165,7 @@ void sendJoinAck(int sd, int connectionID, int debug) {
 
 void sendBcastMessage(int sd, struct message theMessage, int debug) {
 	int i;
-	for ( i = 0; i < MAX_CLIENTS; i++ ) {
+	for ( i = 1; i < MAX_CLIENTS+1; i++ ) {
 		if ( clientRegister[i].connected == 1 ) {
 			sendMessage(sd, i, theMessage, debug);
 		}
@@ -170,5 +183,5 @@ void sendMessage(int sd, int connectionID, struct message theMessage, int debug)
 		(struct sockaddr *)&clientRegister[connectionID].address,
 		sizeof(clientRegister[connectionID].address)) < 0 ) {
 	}
-	pDebug(debug, "Sent message");
+	pDebug(debug, "SENT", theMessage);
 }

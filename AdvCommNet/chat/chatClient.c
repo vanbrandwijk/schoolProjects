@@ -13,7 +13,6 @@
 #include "chatUtil.h"
 
 void usage();
-void pDebug(int debug, char *message);
 void startClient(char *serverName, int port, int debug); 
 struct sockaddr_in getServer(char *serverName, int port, int debug);
 int makeClientSocket (int debug);
@@ -88,6 +87,10 @@ void startClient(char *serverName, int port, int debug) {
 		select(sd+1, &read_fd_set, NULL, NULL, NULL);
 		if ( FD_ISSET(0, &read_fd_set) ) {
 			read(STDIN_FILENO, buffer, MAX_LINE);
+			if ( strncmp(buffer, "QUIT", 4) == 0 ) {
+				break;
+			}
+				
 			sendText(sd, myInformation, debug, buffer);
 		}
 
@@ -104,7 +107,7 @@ int makeClientSocket ( int debug ) {
 	
 	sd = socket(AF_INET, SOCK_DGRAM, 0);
 	if ( sd < 0 ) {
-		pDebug(debug, "Could not create client socket");
+		perror("Could not create client socket");
 	}
 
 	bzero((char *) &client_addr, sizeof(client_addr));
@@ -114,7 +117,7 @@ int makeClientSocket ( int debug ) {
 
 	if ( bind(sd, (struct sockaddr *) &client_addr, sizeof(client_addr))
 		< 0 ) {
-		pDebug(debug, "Could not bind client socket");
+		perror("Could not bind client socket");
 	}
 	return sd;
 }
@@ -146,6 +149,7 @@ int receiveServerMessage(int sd, struct clientInformation myinfo, int debug) {
 	receivedLen = recvfrom(sd, buffer, 3*MAX_LINE, 0, 
 			(struct sockaddr *)&myinfo.address, &serverLen);
 	rmsg = parseMessage(buffer);
+	pDebug(debug, "RECV", rmsg);
 
 	if ( strcmp(rmsg.str1, "JOIN") == 0 ) {
 		if ( strcmp(rmsg.str2, myinfo.hostname) == 0 ) {
@@ -215,5 +219,5 @@ void sendMessage(int sd, struct clientInformation myinfo, struct message theMess
 		theMessage.str2);
 	sendto(sd, buffer, strlen(buffer), 0, (struct sockaddr *)&myinfo.address, sizeof(myinfo.address));
 	
-	pDebug(debug, "Sent message");
+	pDebug(debug, "SENT", theMessage);
 }
