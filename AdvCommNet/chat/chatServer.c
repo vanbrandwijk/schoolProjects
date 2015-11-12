@@ -110,13 +110,12 @@ int receiveClientMessage(int sd, int debug) {
 		(struct sockaddr *)&clientAddr, &clientLen);
 	
 	rmsg = parseMessage(buffer);
-	pDebug(debug, "RECV", rmsg);	
+	pDebug(debug, RECV_STRING, rmsg);	
 
-	if ( rmsg.cid == 0 && strcmp(rmsg.str1,"JOIN") == 0 ) {
+	if ( rmsg.cid == 0 && strcmp(rmsg.str1,JOIN_STRING) == 0 ) {
 		addClient(sd, clientAddr, rmsg.str2, debug);
-	} else if (rmsg.cid < 0 && strcmp(rmsg.str1,"QUIT") == 0 ) {
+	} else if (rmsg.cid < 0 && strcmp(rmsg.str1,QUIT_STRING) == 0 ) {
 		removeClient(sd, rmsg.cid, rmsg.str2, debug);
-		//quit logic
 	} else {
 		sendBcastMessage(sd, rmsg, debug);
 	}
@@ -148,17 +147,17 @@ void addClient(int sd, struct sockaddr_in client_addr, char *domain, int debug) 
 void removeClient(int sd, int cid, char *domain, int debug) {
 	struct message rmsg;
 	rmsg.cid = -1 * cid;
-	strcpy(rmsg.str1, "QUIT");
+	strcpy(rmsg.str1, QUIT_STRING);
 	strcpy(rmsg.str2, domain);
 	
 	sendBcastMessage(sd, rmsg, debug);
-	clientRegister[cid].connected = 0;
+	clientRegister[-1 * cid].connected = 0;
 }
 	
 void sendJoinAck(int sd, int connectionID, int debug) {
 	struct message joinack;
 	joinack.cid = connectionID;
-	strcpy(joinack.str1, "JOIN");
+	strcpy(joinack.str1, JOIN_STRING);
 	strcpy(joinack.str2, clientRegister[connectionID].hostname);
 	sendBcastMessage(sd, joinack, debug);
 }
@@ -183,5 +182,5 @@ void sendMessage(int sd, int connectionID, struct message theMessage, int debug)
 		(struct sockaddr *)&clientRegister[connectionID].address,
 		sizeof(clientRegister[connectionID].address)) < 0 ) {
 	}
-	pDebug(debug, "SENT", theMessage);
+	pDebug(debug, SENT_STRING, theMessage);
 }

@@ -55,6 +55,7 @@ int main( int argc, char *argv[] ) {
 
 void usage() {
 	printf("Usage: chatServer <port> <debug>\n");
+	exit(1);
 }
 
 void startClient(char *serverName, int port, int debug) {
@@ -70,12 +71,12 @@ void startClient(char *serverName, int port, int debug) {
 
 	server_addr = getServer(serverName, port, debug);
 
-	myInformation.connected = 0;
+	myInformation.connected = JOIN_CID_CODE;
 	strcpy(myInformation.hostname, getCDN());
 	bcopy((char *)&server_addr, (char *)&myInformation.address, 
 		sizeof(server_addr));
 
-	while (myInformation.connected == 0 ) {
+	while (myInformation.connected == JOIN_CID_CODE ) {
 		joinChat(sd, myInformation, debug);
 		myInformation.connected = 
 			receiveServerMessage(sd, myInformation, debug);
@@ -86,8 +87,9 @@ void startClient(char *serverName, int port, int debug) {
 
 		select(sd+1, &read_fd_set, NULL, NULL, NULL);
 		if ( FD_ISSET(0, &read_fd_set) ) {
-			read(STDIN_FILENO, buffer, MAX_LINE);
-			if ( strncmp(buffer, "QUIT", 4) == 0 ) {
+			bzero((char *) &buffer, sizeof(buffer));
+			read(STDIN_FILENO, buffer, MAX_LINE-1);
+			if ( strncmp(buffer, QUIT_STRING, 4) == 0 ) {
 				break;
 			}
 				
@@ -149,9 +151,9 @@ int receiveServerMessage(int sd, struct clientInformation myinfo, int debug) {
 	receivedLen = recvfrom(sd, buffer, 3*MAX_LINE, 0, 
 			(struct sockaddr *)&myinfo.address, &serverLen);
 	rmsg = parseMessage(buffer);
-	pDebug(debug, "RECV", rmsg);
+	pDebug(debug, RECV_STRING, rmsg);
 
-	if ( strcmp(rmsg.str1, "JOIN") == 0 ) {
+	if ( strcmp(rmsg.str1, JOIN_STRING) == 0 ) {
 		if ( strcmp(rmsg.str2, myinfo.hostname) == 0 ) {
 			printf("CID=%i assigned\n", rmsg.cid);
 			fflush(stdout);
@@ -161,7 +163,7 @@ int receiveServerMessage(int sd, struct clientInformation myinfo, int debug) {
 			fflush(stdout);
 			return 0;
 		}
-	} else if ( strcmp(rmsg.str1, "QUIT") == 0 ) {
+	} else if ( strcmp(rmsg.str1, QUIT_STRING) == 0 ) {
 		printf("CID=%i %s quit\n", rmsg.cid, rmsg.str2);
 		fflush(stdout);
 		return 0;
@@ -177,8 +179,8 @@ int receiveServerMessage(int sd, struct clientInformation myinfo, int debug) {
 
 void joinChat(int sd, struct clientInformation myinfo, int debug) {
 	struct message joinMessage;
-	joinMessage.cid = 0;
-	strcpy(joinMessage.str1, "JOIN");
+	joinMessage.cid = JOIN_CID_CODE;
+	strcpy(joinMessage.str1, JOIN_STRING);
 	strcpy(joinMessage.str2, myinfo.hostname);
 
 	sendMessage(sd, myinfo, joinMessage, debug);
@@ -205,7 +207,7 @@ void sendText(int sd, struct clientInformation myinfo, int debug, char *txt) {
 void quitChat(int sd, struct clientInformation myinfo, int debug) {
 	struct message quitMessage;
 	quitMessage.cid = -1 * myinfo.connected;
-	strcpy(quitMessage.str1, "QUIT");
+	strcpy(quitMessage.str1, QUIT_STRING);
 	strcpy(quitMessage.str2, myinfo.hostname);
 
 	sendMessage(sd, myinfo, quitMessage, debug);
@@ -219,5 +221,5 @@ void sendMessage(int sd, struct clientInformation myinfo, struct message theMess
 		theMessage.str2);
 	sendto(sd, buffer, strlen(buffer), 0, (struct sockaddr *)&myinfo.address, sizeof(myinfo.address));
 	
-	pDebug(debug, "SENT", theMessage);
+	pDebug(debug, SENT_STRING, theMessage);
 }
